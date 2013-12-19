@@ -69,8 +69,8 @@ unless get-env "UNIQUE_ID" [
 	set-env "UNIQUE_ID" form checksum/secure form now/precise
 ]
 
-use [rq ns][
-	ns: complement charset " #%()/[]{}"
+use [rq fn][
+	fn: charset "abcdefghijklmnopqrstuvwxyz0123456789-"
 
 	rq: any [
 		select system/options/cgi/other-headers "HTTP_INTERNAL_REFERER"
@@ -78,22 +78,12 @@ use [rq ns][
 		"word"
 	]
 
-	if parse/all rq ["/" [1 25 [ns | "%3" ["C" | "E"]] | "/" opt "/"]][
-		foreach [from to][
-			"+" "%2B"
-			"/" "%2F"
-			"<" "%3C"
-			">" "%3E"
-			"?" "%3F"
-		][
-			replace/all next rq from to
-		]
-
+	if parse/all/case rq ["/" 1 40 fn [".r" | ".cgi"] opt ["?" to end]][
 		remove-each [header value] system/options/cgi/other-headers [
 			header = "HTTP_INTERNAL_REFERER"
 		]
 
-		set-env "REQUEST_URI" join "/words/" next rq
+		set-env "REQUEST_URI" join "/relocate/" next rq
 	]
 ]
 

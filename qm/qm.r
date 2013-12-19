@@ -1,7 +1,7 @@
 REBOL [
 	Title: "QuarterMaster"
 	Author: "Christopher Ross-Gill"
-	Version: 0.7.2
+	Version: 0.7.4
 	Notes: {Warning: Work-In-Progress - no liabilities for damage, etc.}
 	License: http://creativecommons.org/licenses/by-sa/3.0/
 	Needs: [2.7.8 shell]
@@ -24,6 +24,19 @@ qm: context [
 	code: []
 	live?: string? system/options/cgi/server-software
 	cheyenne?: parse any [system/options/cgi/server-software ""][thru "Cheyenne" to end]
+	probe: func [data /with prefix][
+		either with [
+			with: join data mold prefix
+			data: :prefix
+		][
+			with: mold data
+		]
+		if response [
+			response/log: append any [response/log "^/"] :with
+			append response/log newline
+		]
+		return :data
+	]
 ]
 
 ;--## SETTINGS
@@ -135,7 +148,7 @@ context [
 
 	press: func [
 		"Evaluates and joins a block of values omitting unset and none values."
-		values [any-block! none!]
+		values [any-block! string! none!]
 		/local out
 	][
 		any [values return none]
@@ -144,7 +157,19 @@ context [
 		append copy "" values
 	]
 
-	raise: func [[throw] reason][throw make error! press envelop reason]
+	raise: func [[throw] reason][throw make error! press reason]
+
+	form-error: func [reason [error!] /local type message][
+		reason: make disarm reason []
+
+		type: system/error/(reason/type)/type
+		message: reform bind envelop system/error/(reason/type)/(reason/id) reason
+		reason: rejoin [
+			"** " type ": " message
+			"^/** Where: " mold reason/where
+			"^/** Near: " mold reason/near
+		]
+	]
 
 	true?: func [test][not not test]
 
@@ -153,7 +178,7 @@ context [
 		foreach word words [if word? word [set/any in dest word get/any word]]
 	]
 
-	export [func does uses try-else verify assert-all with envelop press raise true? export]
+	export [func does uses try-else verify assert-all with envelop press raise form-error true? export]
 ]
 
 ;--## SERIES HELPERS
@@ -461,11 +486,41 @@ context [
 	wiki: [some [wiki* | utf-8]]
 	ws*: white-space: [some ws]
 
+	encode-utf8: func [
+		"Encode a code point in UTF-8 format" 
+		char [integer!] "Unicode code point"
+	][
+		as-string to binary! reduce case [
+			char <= 127 [[char]]
+
+			char <= 2047 [[
+				char and 1984 / 64 + 192 
+				char and 63 + 128
+			]]
+
+			char <= 65535 [[
+				char and 61440 / 4096 + 224 
+				char and 4032 / 64 + 128 
+				char and 63 + 128
+			]]
+
+			char <= 2097151 [[
+				char and 1835008 / 262144 + 240 
+				char and 258048 / 4096 + 128 
+				char and 4032 / 64 + 128 
+				char and 63 + 128
+			]]
+
+			; true [[]]
+			true [[40 63 41]]
+		]
+	]
+
 	amend: func [rule [block!]][
 		bind rule 'self
 	]
 
-	export [get-ucs-code decode-utf amend]
+	export [get-ucs-code decode-utf encode-utf8 amend]
 ]
 
 ;--## STRING HELPERS
@@ -930,16 +985,70 @@ context [
 		'key      [word 0 6 [#"." word]]
 	]
 
+	load-rfc3339: func [date [string!]][
+		date: replace copy date "T" "/"
+		replace date "Z" "+0:00"
+		attempt [to-date date]
+	]
+
+	load-rfc822: use [day month][
+		day: remove collect [
+			foreach day system/locale/days [
+				keep '|
+				keep copy/part day 3
+			]
+		]
+
+		month: remove collect [
+			foreach month system/locale/months [
+				keep '|
+				keep copy/part month 3
+			]
+		]
+
+		; "Tue, 08 Jan 2013 15:19:11 UTC"
+		func [date [string!] /local part checked][
+			date: collect [
+				checked: parse/all date amend [
+					day ", "
+					copy part 2 digit (keep part)
+					" " (keep "-")
+					copy part month (keep part)
+					" " (keep "-")
+					copy part 4 digit (keep part)
+					" " (keep "/")
+					copy part [
+						2 digit ":" 2 digit opt [":" 2 digit]
+					] (keep part)
+					" "
+					[
+						  ["UTC" | "GMT"]
+						| copy part [["+" | "-"] 2 digit ":" 2 digit] (keep part)
+						| copy part [["+" | "-"] 4 digit] (
+							insert at part 4 ":"
+							keep part
+						)
+						| to end
+					]
+				]
+			]
+			if checked [to date! rejoin date]
+		]
+	]
+
 	as: func [
 		[catch] type [datatype!] value [any-type!]
 		/where format [none! block! any-word!]
 	][
 		case/all [
+			none? value [return none]
 			all [string? value any [type <> string! any-word? format]][value: trim value]
-			type = logic! [if find ["false" "off" "no" "0" 0] value [return false]]
+			type = logic! [if find ["false" "off" "no" "0" 0 false off no] value [return false]]
 			all [string? value type = date!][
-				value: replace copy value "T" "/"
-				replace value "Z" "+0:00"
+				value: any [
+					load-rfc3339 value
+					load-rfc822 value
+				]
 			]
 			block? format [format: amend bind format 'value]
 			none? format [format: select masks type]
@@ -1110,7 +1219,7 @@ context [
 		spec
 	]
 
-	import: func [
+	validate: import: func [
 		[catch] source [any-type!] spec [block!]
 		/block /report-to errs [block!]
 	][
@@ -1313,7 +1422,7 @@ context [
 		unless qm/errors: all [not empty? spec/errors spec/errors][spec/result]
 	]
 
-	export [import loose-import match]
+	export [import validate loose-import match]
 ]
 
 ;--## FILESYSTEM
@@ -1322,14 +1431,16 @@ context [
 	sw*: system/words
 	rights: [
 		folder [
-			owner-read: group-read: world-read:
-			owner-write: group-write: world-write:
-			owner-execute: group-execute: world-execute: #[true]
+			owner-read: group-read:
+			owner-write: group-write:
+			owner-execute: group-execute: #[true]
+			world-read: world-write: world-execute: #[false]
 		]
 		file [
-			owner-read: group-read: world-read:
-			owner-write: group-write: world-write: #[true]
-			owner-execute: group-execute: world-execute: #[false]
+			owner-read: group-read:
+			owner-write: group-write: #[true]
+			owner-execute: group-execute: #[false]
+			world-read: world-write: world-execute: #[false]
 		]
 	]
 
@@ -1558,6 +1669,8 @@ context [
 ;-------------------------------------------------------------------##
 context [
 	root: wrt://support/
+	app: wrt://system/support/
+
 	cache: []
 
 	require: know: func [[catch] location [file!] /reset /args arg /local helper][
@@ -1565,7 +1678,10 @@ context [
 		any [
 			select cache location
 			if all [
-				helper: attempt [load/header root/:location]
+				helper: any [
+					attempt [load/header app/:location]
+					attempt [load/header root/:location]
+				]
 				helper: context compose [
 					system/script: make system/script compose/only [
 						title: helper/1/title
@@ -2036,7 +2152,7 @@ context [
 		out
 	]
 
-	export [clean-view-path render build]
+	export [clean-view-path render render-each build]
 ]
 
 ;--## MySQL
@@ -2062,7 +2178,7 @@ context [
 	port-flags: system/standard/port-flags/pass-thru or 32 ; /binary
 
 	last-packet?: func [status [integer!]][status = 254]
-	closed?: func [port [port!]][port/state/flags and 1024 = 1024]
+	closed?: func [port [port!]][not zero? port/state/flags and 1024]
 	write?: func [port [port!]][port/state/flags and 2 = 2]
 
 	throws: [closed "closed"]
@@ -2073,7 +2189,9 @@ context [
 
 	reopen: func [[catch] port [port!]][
 		net-log "Connection closed by server! Reopening"
-		if throws/closed = catch [open port][throw raise "Server down!"]
+		if throws/closed = catch [
+			open port
+		][throw raise "Server down!"]
 	]
 
 	assert-open: func [[catch] port [port!]][
@@ -2083,7 +2201,6 @@ context [
 			port/state/flags: 1024
 			throw-on-error [reopen port]
 		]
-
 		unless closed? port/sub-port [true]
 	]
 
@@ -2223,10 +2340,11 @@ context [
 
 	transcribe: use [
 		null string byte int int24 long long64 length nbytes field
-		value byte-char null? b0 b1 b2 b3 mk
+		value byte-char null? b0 b1 b2 b3 mk remnants
 	][
 		b0: b1: b2: b3: value: mk: none
-		byte-char: complement charset []
+		; byte-char: complement charset []
+		byte-char: [skip]
 
 		null: to char! 0
 
@@ -2251,7 +2369,8 @@ context [
 			byte (b2: value) 
 			byte (
 				b3: value
-				value: to integer! b0 + (256 * b1) + (65536 * b2) + (16777216.0 * b3)
+				value: b0 + (256 * b1) + (65536 * b2) + (16777216.0 * b3)
+				value: any [attempt [to integer! value] value]
 			)
 		]
 
@@ -2273,8 +2392,17 @@ context [
 			length copy value value skip
 		]
 
-		transcribe: func [data [series!] rule [block!]][
-			parse/all/case data bind rule 'value
+		remnant: [(value: none) copy value some skip]
+
+		transcribe: func [message [string!] data [series!] rule [block!] /local complete][
+			complete: false
+			rule: bind rule 'value
+			parse/all/case data [rule end (complete: true)]
+			net-log reform ["TRANSCRIBE" message to tag! complete]
+			unless complete [
+				net-log ["Bad Packet:" mold enbase/base to binary! data 16]
+			]
+			complete
 		]
 	]
 
@@ -2284,7 +2412,7 @@ context [
 			close port/sub-port
 			throw throws/closed
 		]		
-		net-log reform ["low level read of" size "bytes"] 
+		net-log ["low level read of" size "bytes"] 
 		size
 	]
 
@@ -2304,9 +2432,9 @@ context [
 		;--- reading header ---
 			defrag-read port wire/buffer std-header-length
 
-			transcribe wire/buffer [
+			transcribe "Read Packet" wire/buffer [
 				int24 (packet-size: value)
-				byte  (wire/seq-num: value)
+				byte  (wire/seq-num: value net-log ["Seq." mold to issue! value "of" to tag! packet-size])
 			]
 
 		;--- reading data ---
@@ -2331,7 +2459,7 @@ context [
 
 			switch status [
 				255 [ ; exception
-					transcribe next wire/buffer case [
+					transcribe "Recover Exception" next wire/buffer case [
 						find wire/capabilities 'protocol-41 [
 							[
 								int    (wire/error-code: value)
@@ -2361,11 +2489,11 @@ context [
 
 				254 [ ; eof
 					case [
-						packet-size = 5 [
+						transcribe "EOF" next wire/buffer [
+							int (net-log ["Warnings:" value])
+							int (net-log ["Status:" value])
+						][
 							wire/more-results?: not zero? wire/buffer/4 and 8
-							wire/stream-end?: true
-						]
-						packet-size = 1 [
 							wire/stream-end?: true
 						]
 					]
@@ -2373,15 +2501,22 @@ context [
 
 				0 [ ; ok
 					if none? wire/expecting [
-						transcribe next wire/buffer [
-							length (wire/matched-rows: value)
+						transcribe "Ok" next wire/buffer [
 							length
-							int (wire/more-results?: not zero? value and 8)
+							length
+							int (wire/more-results?: not zero? value and 8 net-log ["Ok/Status:" to tag! value])
+							int (net-log ["Ok/Warnings:" to tag! value])
+							opt remnant (
+								if value [net-log ["Ok/Message:" value]]
+								wire/matched-rows: value
+							)
 						]
 						wire/stream-end?: true
 					]
 				]
 			]
+
+			net-log to string! wire/buffer
 
 			wire/buffer
 		]
@@ -2442,6 +2577,7 @@ context [
 		send-packet: func [port [port!] data [string! block!]][
 			net-log ["SEND PACKET" to tag! port/locals/seq-num: port/locals/seq-num + 1]
 			if block? data [data: rejoin bind data 'send-packet]
+			net-log ["Packet" mold data]
 
 			data: join #{} [
 				to-int24 length? data
@@ -2612,13 +2748,12 @@ context [
 	send-query: use [get-column-count get-column-headers][
 		get-column-count: func [port [port!] /local wire count][
 			wire: port/locals
-			transcribe read-packet port [
-				length (if zero? count: value [wire/stream-end?: true])
-				length (wire/matched-rows: value)
-				length
-				int (wire/more-results?: not zero? value and 8)
+			transcribe "Get Column Count" read-packet port [
+				#{00} (count: 0) remnant ; OK packet, already processed by 'read-packet
+				|
+				length (count: value)
 			]
-			unless zero? count [wire/matched-rows: none]
+			net-log ["Column Count:" to tag! count]
 			count
 		]
 
@@ -2659,7 +2794,7 @@ context [
 			]
 
 			header!: make object! [
-				table: name: length: code: type: flags: decimals: none
+				table: name: length: code: type: flags: decimals: charset: none
 			]
 
 			get-column-headers: func [
@@ -2671,7 +2806,7 @@ context [
 
 				loop count [
 					header: make header! []
-					transcribe read-packet port [
+					transcribe join "Get Column Header #" count read-packet port [
 						field  ; catalog
 						field  ; db
 						field  (header/table: value)
@@ -2679,7 +2814,7 @@ context [
 						field  (header/name: to word! value)
 						field  ; org-name
 						byte   ; filler
-						int    ; charsetnr
+						int    (header/charset: value)
 						long   (header/length: value)
 						byte   (header/type: type? header/code: value)
 						int    (header/flags: get-flags value header-flags)
@@ -2688,7 +2823,9 @@ context [
 						nbytes ; default
 					]
 					append wire/columns :header
+					net-log header
 				]
+
 
 				read-packet port			; check the ending flag
 				unless wire/stream-end? [
@@ -2748,8 +2885,9 @@ context [
 		auto-ping: func [[catch] port [port!] /local response][
 			if port/locals/auto-ping? [
 				net-log "Sending Ping"
+				response: catch [send-command/response ping port []]
 				if any [
-					throws/closed = response: catch [send-command/response ping port []]
+					throws/closed = response
 					not response
 				][
 					net-log "PING FAILED"
@@ -2819,7 +2957,7 @@ context [
 				float			[to decimal!]
 				double			none
 				null			none
-				timestamp		none
+				timestamp		[to-datetime]
 				longlong		[to integer!]
 				int24			[to integer!]
 				date			[to-date]
@@ -2909,12 +3047,15 @@ context [
 
 		traverse: func [
 			port [port!] limit [none! integer!]
-			/local wire row-data row rows column-count count
+			/local wire row-data row rows column-count count last-row
 		][
 			net-log "TRAVERSE"
 			wire: port/locals
 
-			either wire/stream-end? [make block! []][
+			either wire/stream-end? [
+				net-log "Traverse Truncated"
+				make block! 0
+			][
 				rows: make block! max any [limit 0] wire/rows
 				column-count: length? wire/columns
 				count: 0
@@ -2926,8 +3067,11 @@ context [
 
 					row: make block! column-count
 
-					transcribe row-data [
+					unless transcribe "Traverse" row-data [
 						any [field (append row value)]
+					][
+						probe to string! wire/buffer
+						probe to string! wire/cache
 					]
 
 					either wire/flat? [
@@ -3064,7 +3208,7 @@ context [
 					wire/cache: make binary! wire/buffer-size
 				]
 
-				transcribe read-packet port [
+				transcribe "Handshake" read-packet port [
 					byte   (wire/protocol: value)
 					string (wire/version: value)
 					long   (wire/thread-id: value)
@@ -3172,7 +3316,7 @@ context [
 			net-log "OPEN HANDLER"
 			throw-on-error [assert-handshake port]
 
-			insert port "SET collation_connection = utf8_general_ci; SET NAMES utf8;"
+			insert port "SET collation_connection = utf8_unicode_ci; SET NAMES utf8;"
 
 			unless write? port [
 				either statement: port/state/custom [
@@ -3477,7 +3621,7 @@ context [
 						| "decimal(" copy size some digit ",2)" end (type: money! size: 2 + to integer! size)
 						| "decimal" end (type: money!)
 						| "float" end (type: decimal!)
-						| "date" opt "time" end (type: date!)
+						| "date" ["time" | "stamp" |] end (type: date!)
 						| "timestamp" end (type: date!)
 						| "time" end (type: time!)
 						| "tinyint(1)" end (type: logic!)
@@ -3573,7 +3717,11 @@ context [
 
 						any [
 							not spec/size
-							spec/size >= length? form value
+							spec/size >= either string! = spec/type [
+								string-length? form value
+							][
+								length? form value
+							]
 							none? value
 						][
 							report :key 'too-long [uppercase form key " is too long"]
@@ -3635,7 +3783,8 @@ context [
 
 		select: func [
 			[catch] table [port!] criteria
-			part aperture only? case? any? with* wild skip* offset /local result record
+			part aperture only? case? any? with* wild skip* offset
+			/local statement result record
 		][
 			case [
 				criteria = 'new [
@@ -3645,9 +3794,9 @@ context [
 				block? criteria [
 					either all [
 						word? sw*/pick criteria 1
-						local: get in table/locals/queries criteria/1
+						statement: get in table/locals/queries criteria/1
 					][
-						result: throw-on-error [query-db/named attempt [join envelop local next criteria]]
+						result: throw-on-error [query-db/named attempt [join envelop statement next criteria]]
 						collect [foreach record result [keep load-record table record]]
 					][
 						throw-on-error [raise "Not a Valid Query"]
@@ -3730,17 +3879,15 @@ context [
 		]
 
 		copy: func [table [port!]][
-			any [
-				all [
-					result: query-db/named [
-						"SELECT * FROM ? LIMIT ?,?"
-						to word! table/locals/name
-						table/state/index
-						table/state/num
-					]
-					each record result [record: load-record table record]
+			collect [
+				foreach record query-db/named [
+					"SELECT * FROM ? LIMIT ?,?"
+					to word! table/locals/name
+					table/state/index
+					table/state/num
+				][
+					keep load-record table record
 				]
-				make block! []
 			]
 		]
 
@@ -3771,24 +3918,26 @@ context [
 			]
 		]
 
-		each [name spec] specs [
-			spec: bind load/header root/:spec qm/models
-			type: get in spec/1 'type
-			spec: compose [
-				name: (to lit-word! name)
-				header: (spec)
-			]
-			spec: switch type?/word type [
-				word! [
-					spec: compose/only [scheme: (to lit-word! type) locals: (spec)]
-					if error? spec: try [open spec][
-						raise ["Error opening Model: %models/" name ".r <" type "::" name ">"]
-					]
-					spec
+		throw-on-error [
+			each [name spec] specs [
+				spec: bind load/header root/:spec qm/models
+				type: get in spec/1 'type
+				spec: compose [
+					name: (to lit-word! name)
+					header: (spec)
 				]
-				none! [context bind spec qm/models]
+				spec: switch type?/word type [
+					word! [
+						spec: compose/only [scheme: (to lit-word! type) locals: (spec)]
+						if error? spec: try [open spec][
+							raise ["Error opening Model: %models/" name ".r <" type "::" name ">"]
+						]
+						spec
+					]
+					none! [context bind spec qm/models]
+				]
+				set in qm/models name spec
 			]
-			set in qm/models name spec
 		]
 
 		qm/models
@@ -3807,190 +3956,6 @@ context [
 ;-------------------------------------------------------------------##
 unless system/options/cgi/request-method [
 	all [system/product = 'base know %core/help.r]
-	recycle halt
-]
-
-;--## REQUEST
-;-------------------------------------------------------------------##
-qm/request: make system/options/cgi [
-	controller: action: input: target: format: aspect: none
-	remote-addr: as tuple! remote-addr
-	query: []
-
-	get-header: func [name][select other-headers form name]
-
-	clear find request-path: copy request-uri: as file! any [
-		get-header "HTTP_INTERNAL_REFERER" ; Cheyenne
-		get-env "REQUEST_URI"
-		"/"
-	] "?"
-
-	path-info: parse/all remove copy request-path "/"
-
-	if target: pick path-info length? path-info [
-		use [chars name part][
-			name: amend [1 20 symbol]
-			chars: complement charset ".,"
-
-			parse/all target [
-				any chars target: any [
-					  copy part ["." name] (format: part)
-					| copy part ["," name] (aspect: part)
-				][
-					end (
-						format: all [format to file! format]
-						aspect: all [aspect to file! aspect]
-					) | (format: aspect: none)
-				]
-			]
-
-			target: head clear target
-		]
-	]
-
-	controller: take path-info
-
-	map cookies: any [
-		all [
-			cookies: select other-headers "HTTP_COOKIE"
-			parse cookies ";="
-		]
-		[]
-	] :url-decode
-
-	; Must fix 'decode-options
-	; accept-types: decode-options select other-headers "HTTP_ACCEPT" path!
-	; accept-languages: decode-options select other-headers "HTTP_ACCEPT_LANGUAGE" word!
-	; accept-encodings: decode-options select other-headers "HTTP_ACCEPT_ENCODING" word!
-	; accept-charsets: decode-options select other-headers "HTTP_ACCEPT_CHARSET" word!
-
-	case/all [
-		"get" = action: request-method [
-			query: load-webform query-string
-		]
-
-		"post" = action [
-			if find ["put" "delete"] query-string [action: query-string]
-			; unless empty? query-string [action: query-string]
-		]
-	]
-
-	action: form as word! lowercase action
-
-	content-limit: settings/post-limit
-	content-boundary: #[none]
-
-	content-type: as path! content-type
-	type: none
-
-	all [
-	  ;--- content length ---
-		content-length: any [as integer! content-length 0]
-		0 < content-length
-
-	  ;--- content type ---
-		parse form content-type [
-			[
-				"text/" [
-					  opt "x-" "rebol" (type: %.r)
-					| "xml" (type: %.xml)
-					| opt "x-" "json" (type: %.json)
-					| "html" (type: %.html)
-				]
-				| "application/" [
-					  "x-www-form-urlencoded" (type: %.url)
-					| "xml" (type: %.xml)
-				]
-				| "multipart/form-data;" "boundary=" content-boundary: some chars (
-					type: %.formdata
-					content-boundary: join "--" content-boundary
-				)
-			]
-		]
-	]
-
-	;-- body is the raw data from the HTTP request
-	body: func [/binary /local tmp][
-		body: copy either binary [#{}][{}]
-		set-modes system/ports/input [lines: false]
-		unless binary [set-modes system/ports/input [binary: false]]
-		body: copy system/ports/input
-		; body: copy/part system/ports/input content-length
-		; ^^^^^^^^ problem, not sure why...
-	]
-
-	if qm/cheyenne? [
-		input: get in system/words 'input
-
-		body: func [/binary][
-		 	body: either all [
-				body: input
-				content-length = length? body
-			][body][#{}]
-			either binary [body][to string! body]
-		]
-	]
-
-	;-- content is the body 'loaded' according to the content-type header
-	content: func [[catch]][
-		throw-on-error [
-			content: switch type [
-				%.url [load-webform body]
-				%.r [attempt [load/header body]]
-				%.formdata [
-					; know %qm/multipart.r
-					load-multipart body/binary content-boundary
-				]
-			]
-		]
-		any [content []]
-	]
-
-	get-cookie: func [name][select cookies form name]
-	get-param: func ['name /query /body /local result][
-		result: copy [query #[none] body #[none]]
-		unless body [result/query: get-from self/query :name]
-		unless query [result/body: get-from self/content :name]
-		any [result/query result/body]
-	]
-
-	export [get-header get-cookie get-param]
-]
-
-;--## RESPONSE
-;-------------------------------------------------------------------##
-qm/response: context [
-	status: 200
-	headers: make string! ""
-	type: 'text/html
-	charset: "utf-8"
-	scripts: []
-
-	template: length: body: view: format: aspect: none
-
-	set-header: func [header value][
-		repend headers [header ": " value newline]
-	]
-
-	clear-cookie: func [key /path root /domain base][
-		key: join form key "=; expires=Thu, 01 Jan 1970 00:00:00 GMT"
-		repend key ["; path=" any [root %/]]
-		if domain [repend key ["; domain=" base]]
-		set-header 'Set-Cookie key
-	]
-
-	set-cookie: func [key value /expires on [date!] /path root [file!] /domain base [string!] /open][
-		value: rejoin collect [
-			keep [form key "=" url-encode value]
-			if expires [keep form-date/gmt on "; expires=%a, %d %b %Y %T GMT"]
-			keep ["; path=" any [root %/]]
-			if domain [keep ["; domain=" base]]
-			unless open [keep "; HttpOnly"]
-		]
-		set-header 'Set-Cookie value
-	]
-
-	export [set-header set-cookie clear-cookie]
 ]
 
 ;--## VIEW
@@ -4003,20 +3968,6 @@ context [
 		500 "Internal Server Error" 503 "Service Unavailable"
 	]
 
-	log: #[none]
-
-	probe: func [data /with prefix][
-		either with [
-			with: join data mold prefix
-			data: :prefix
-		][
-			with: mold data
-		]
-		log: append any [log "^/"] :with
-		append log newline
-		return :data
-	]
-
 	send-response: func [body [string! binary!]][
 		system/ports/output/state/with: "^/"
 		; body: join body ["<div><b>" difference now/precise st "</b></div>"]
@@ -4025,14 +3976,14 @@ context [
 		body
 	]
 
-	if find qm/request/server-software "Cheyenne" [
+	if qm/cheyenne? [
 		send-response: func [body [string! binary!]][
 			prin to string! body
 		]
 	]
 
-	publish: has [yield][
-		with qm/response [
+	publish: func [response [object!] /local yield][
+		with response [
 			either yield: body: case [
 				any [none? body empty? body][" "]
 				string? body [render body]
@@ -4069,6 +4020,7 @@ context [
 					]
 				]
 
+				; should be response/deflate? or something
 				; find request/accept-encodings 'deflate [
 				; 	set-header 'Content-Encoding "deflate"
 				; 	; IE and Safari need deflate header and footer removed
@@ -4091,7 +4043,7 @@ context [
 		]
 	]
 
-	export [publish probe]
+	export [publish]
 ]
 
 ;--## CONTROLLER
@@ -4206,7 +4158,7 @@ context [
 
 			with/only route [
 				'route (with route options)
-				set path paren! 'to set view file! into [
+				set path paren! 'to set view [file! | word!] (view: to file! view) into [
 					some [
 						(method: where: action: none)
 						set method ['get | 'post | 'put | 'delete | 'head]
@@ -4271,7 +4223,7 @@ context [
 		]
 	]
 
-	route: func [request [object!] /local route action file args code] with/only qm [
+	route: func [request [object!] response [object!] /local route action file args code] with/only qm [
 		unless controller: any [
 			request/controller
 			settings/default-controller
@@ -4375,46 +4327,230 @@ context [
 
 ;--## ENGAGE
 ;-------------------------------------------------------------------##
-try-else [
-	with qm [
-		protect 'request
-		protect 'response
-		engage-model
-		route request
-		disengage-model
-		publish response
+if qm/live? [
+	qm/request: make system/options/cgi [
+		cgi?: false
+
+		controller: action: input: target: format: aspect: none
+		remote-addr: as tuple! remote-addr
+		query: []
+
+		get-header: func [name][select other-headers form name]
+
+		clear find request-path: copy request-uri: as file! any [
+			get-header "HTTP_INTERNAL_REFERER" ; Cheyenne
+			get-env "REQUEST_URI"
+			"/"
+		] "?"
+
+		path-info: parse/all remove copy request-path "/"
+
+		if target: pick path-info length? path-info [
+			use [chars name part][
+				name: amend [1 20 symbol]
+				chars: complement charset ".,"
+
+				parse/all target [
+					any chars target: any [
+						  copy part ["." name] (format: part)
+						| copy part ["," name] (aspect: part)
+					][
+						end (
+							format: all [format to file! format]
+							aspect: all [aspect to file! aspect]
+						) | (format: aspect: none)
+					]
+				]
+
+				target: head clear target
+			]
+		]
+
+		controller: take path-info
+
+		map cookies: any [
+			all [
+				cookies: select other-headers "HTTP_COOKIE"
+				parse cookies ";="
+			]
+			[]
+		] :url-decode
+
+		; Must fix 'decode-options
+		; accept-types: decode-options select other-headers "HTTP_ACCEPT" path!
+		; accept-languages: decode-options select other-headers "HTTP_ACCEPT_LANGUAGE" word!
+		; accept-encodings: decode-options select other-headers "HTTP_ACCEPT_ENCODING" word!
+		; accept-charsets: decode-options select other-headers "HTTP_ACCEPT_CHARSET" word!
+
+		case/all [
+			"get" = action: request-method [
+				query: load-webform query-string
+			]
+
+			"post" = action [
+				if find ["put" "delete"] query-string [action: query-string]
+				; unless empty? query-string [action: query-string]
+			]
+		]
+
+		action: form as word! lowercase action
+
+		content-limit: settings/post-limit
+		content-boundary: #[none]
+
+		content-type: as path! content-type
+		type: none
+
+		all [
+		  ;--- content length ---
+			content-length: any [as integer! content-length 0]
+			0 < content-length
+
+		  ;--- content type ---
+			parse form content-type [
+				[
+					"text/" [
+						  opt "x-" "rebol" (type: %.r)
+						| "xml" (type: %.xml)
+						| opt "x-" "json" (type: %.json)
+						| "html" (type: %.html)
+					]
+					| "application/" [
+						  "x-www-form-urlencoded" (type: %.url)
+						| "xml" (type: %.xml)
+					]
+					| "multipart/form-data;" "boundary=" content-boundary: some chars (
+						type: %.formdata
+						content-boundary: join "--" content-boundary
+					)
+				]
+			]
+		]
+
+		;-- body is the raw data from the HTTP request
+		body: func [/binary /local tmp][
+			body: copy either binary [#{}][{}]
+			set-modes system/ports/input [lines: false]
+			unless binary [set-modes system/ports/input [binary: false]]
+			body: copy system/ports/input
+			; body: copy/part system/ports/input content-length
+			; ^^^^^^^^ problem, not sure why...
+		]
+
+		if qm/cheyenne? [
+			input: get in system/words 'input
+
+			body: func [/binary][
+			 	body: either all [
+					body: input
+					content-length = length? body
+				][body][#{}]
+				either binary [body][to string! body]
+			]
+		]
+
+		;-- content is the body 'loaded' according to the content-type header
+		content: func [[catch]][
+			throw-on-error [
+				content: switch type [
+					%.url [load-webform body]
+					%.r [attempt [load/header body]]
+					%.formdata [
+						; know %qm/multipart.r
+						load-multipart body/binary content-boundary
+					]
+				]
+			]
+			any [content []]
+		]
+
+		get-cookie: func [name][select cookies form name]
+		get-param: func ['name /query /body /local result][
+			result: copy [query #[none] body #[none]]
+			unless body [result/query: get-from self/query :name]
+			unless query [result/body: get-from self/content :name]
+			any [result/query result/body]
+		]
+
+		export [get-header get-cookie get-param]
 	]
-][
-	; print "Content-Type: text/plain^/"
-	reason: make disarm reason []
 
-	trims: func [string [string!]][
-		trim/tail trim/auto string
-	]
-
-	qm/binding: 'reason
-	qm/handler: %.rsp
-
-	reason-type: system/error/(reason/type)/type
-	reason-message: reform bind envelop system/error/(reason/type)/(reason/id) reason
-	reason: rejoin [
-		"** " reason-type ": " reason-message
-		"^/** Where: " mold reason/where
-		"^/** Near: " mold reason/near
-	]
-
-	with qm/response [
-		status: 500
+	qm/response: context [
+		status: 200
+		headers: make string! ""
 		type: 'text/html
-		template: none
-		body: trims settings/exceptions
+		charset: "utf-8"
+		scripts: []
+
+		template: length: body: log: view: format: aspect: none
+
+		set-header: func [header value][
+			repend headers [header ": " value newline]
+		]
+
+		clear-cookie: func [key /path root /domain base][
+			key: join form key "=; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+			repend key ["; path=" any [root %/]]
+			if domain [repend key ["; domain=" base]]
+			set-header 'Set-Cookie key
+		]
+
+		set-cookie: func [key value /expires on [date!] /path root [file!] /domain base [string!] /open][
+			value: rejoin collect [
+				keep [form key "=" url-encode value]
+				if expires [keep form-date/gmt on "; expires=%a, %d %b %Y %T GMT"]
+				keep ["; path=" any [root %/]]
+				if domain [keep ["; domain=" base]]
+				unless open [keep "; HttpOnly"]
+			]
+			set-header 'Set-Cookie value
+		]
+
+		export [set-header set-cookie clear-cookie]
 	]
 
-	publish
+	try-else [
+		with qm [
+			protect 'request
+			protect 'response
+			export [probe]
+			engage-model
+			route request response
+			disengage-model
+			publish response
+		]
+	][
+		; print "Content-Type: text/plain^/"
+		reason: make disarm reason []
 
-	attempt [
-		save to url! form-date/gmt now "wrt://space/crash/err%Y%m%d-%H%M%S.txt" reduce [
-			now form qm/request/request-uri reason
+		reason-type: system/error/(reason/type)/type
+		reason-message: reform bind envelop system/error/(reason/type)/(reason/id) reason
+		reason: rejoin [
+			"** " reason-type ": " reason-message
+			"^/** Where: " mold reason/where
+			"^/** Near: " mold reason/near
+		]
+
+		trims: func [string [string!]][
+			trim/tail trim/auto string
+		]
+
+		qm/binding: 'reason
+		qm/handler: %.rsp
+
+		with qm/response [
+			status: 500
+			type: 'text/html
+			template: none
+			body: trims settings/exceptions
+		]
+
+		publish qm/response
+
+		attempt [
+			save to url! form-date/gmt now "wrt://space/crash/err%Y%m%d-%H%M%S.txt" reduce [
+				now qm/request/server-name form qm/request/request-uri reason
+			]
 		]
 	]
 ]

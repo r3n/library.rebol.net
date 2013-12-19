@@ -439,6 +439,7 @@ grammar!: context [
 	document: %document.r
 	paragraph: %paragraph.r
 	markup: %html.r
+	model: none
 ]
 
 resolve: use [resolve-path][
@@ -460,6 +461,9 @@ resolve: use [resolve-path][
 		if any [file? options/template url? options/template][
 			options/template: resolve-path options/root options/template
 		]
+		if any [file? options/model url? options/model][
+			options/template: resolve-path options/root options/template
+		]
 		options
 	]
 ]
@@ -468,17 +472,6 @@ resolve: use [resolve-path][
 load-doc: use [document!][
 	document!: context [
 		options: source: text: document: values: none
-
-		render: func [/custom options [block! object! none!]][
-			make-doc/custom self make self/options any [options []]
-		]
-
-		title: has [title][
-			if parse document [opt ['options skip] 'para set title block! to end][
-				form-para title
-			]
-		]
-
 		outline: func [/level depth [integer!]][
 			level: copy/part [sect1 sect2 sect3 sect4] max 1 min 4 any [depth 2]
 			remove-each [style para] copy document [
@@ -493,7 +486,13 @@ load-doc: use [document!][
 						keep form-para para
 					]
 				]
+		title: has [title][
+			if parse document [opt ['options skip] 'para set title block! to end][
+				form-para title
 			]
+		]
+		render: func [/custom options [block! object! none!]][
+			make-doc/custom self make self/options any [options []]
 		]
 	]
 
@@ -506,7 +505,15 @@ load-doc: use [document!][
 		options: make grammar! any [options []]
 		resolve options
 
-		model: make document! any [model []]
+		model: make document! any [
+			model
+			switch type?/word options/model [
+				object! block! [model]
+				file! url! [attempt [load options/model]]
+			]
+			[]
+		]
+
 		model/options: options
 		model/values: copy []
 

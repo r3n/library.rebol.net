@@ -1,0 +1,9 @@
+<div class="page-header">
+<div class="container">
+	<h1><%== script %></h1>
+</div>
+</div>
+
+<div class="container">
+<pre><%== description %></pre>
+</div>

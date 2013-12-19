@@ -3,7 +3,7 @@ REBOL [
 	Date: 16-Jul-2013
 	Author: "Christopher Ross-Gill"
 	Type: 'controller
-	Template: %templates/words.rsp
+	Template: %templates/library.rsp
 ]
 
 route () to %home [
