@@ -5,7 +5,7 @@ Official script repository for the Rebol language. Prototype currently working a
 
 ## Test Installation Using Cheyenne
 
-1. Create the CGI script (as easy as `cp cgi-bin/library.txt cgi-bin/library.cgi`)
+1. Create the CGI script (as easy as `cp cgi-bin/library.txt cgi-bin/library.r`)
 
 2. Download the Cheyenne binary appropriate for your system, `chmod +x ...` the binary and run from the `cheyenne` folder.
 
