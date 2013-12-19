@@ -5,7 +5,7 @@
 </div>
 
 <div class="container">
-<pre class="code rebol prettyprint lang-rebol"><%== description %></pre>
+<pre class="code rebol prettyprint lang-rebol"><%== detab description %></pre>
 </div>
 
 <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
