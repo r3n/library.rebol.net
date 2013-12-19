@@ -486,11 +486,15 @@ load-doc: use [document!][
 						keep form-para para
 					]
 				]
+			]
+		]
+
 		title: has [title][
 			if parse document [opt ['options skip] 'para set title block! to end][
 				form-para title
 			]
 		]
+
 		render: func [/custom options [block! object! none!]][
 			make-doc/custom self make self/options any [options []]
 		]
