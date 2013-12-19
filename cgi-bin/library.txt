@@ -1,0 +1,100 @@
+Ideally the CGI script would go here, but don't know how to configure Cheyenne to do this. At this time, it is assumed the Rebol 2 Core binary is located and executable at /usr/local/bin
+
+Note: The CGI script contains settings and should *NOT* be included in the repository. To test locally, use the following:
+--
+
+#!/usr/local/bin/rebol -cs
+
+REBOL [
+	Title: "Help Launcher"
+	Date: 16-Jul-2013
+	Author: "Christopher Ross-Gill"
+	Path: %../qm/qm.r
+	Settings: [
+		home: http://scripts.rebol.info/
+		domain: "scripts.rebol.info"
+		owner: #[email! "@rgchris"]
+		public-key: "lib"
+		private-key: "In the Library"
+		session-timeout: 0:2
+		database: none ; mysql://localhost/library
+		zone: -6:00
+		post-limit: 500 ;-- not active yet; can be altered per controller/action
+		default-controller: "home"
+
+		email: [
+			name "Starter"
+			email starter@domain
+			host "mail.domain"
+			user "starter!domain"
+			pass "starter#email#12345"
+			type "text/html"
+		]
+
+		spaces: [
+			;-- QM requires entries for "system" "data" "site" "support"
+			;-- Fixed Filepaths Preferred
+			"system"  %../app/
+			"space"   %../space/
+			"site"    %../html/
+			"support" %../qm/support/
+
+			;-- Add more for your convenience
+		]
+
+		debug: true
+
+		exceptions: {
+			<html><head>
+			<title>Error: <%== reason-type %></title>
+			<link href="http://reb4.me/s/anywhere.css" rel="stylesheet" /></head>
+			<body>
+			<h1>Library Project</h1>
+			<h2>Error Message</h2>
+			<pre><code><%== reason %></code></pre>
+			</body>
+			</html>
+		}
+
+		connections: [
+			oauth:flickr.com [
+				consumer-key: #flickr-key
+				consumer-secret: #flickr-secret
+			]
+		]
+	]
+]
+
+unless get-env "UNIQUE_ID" [
+	set-env "UNIQUE_ID" form checksum/secure form now/precise
+]
+
+use [rq ns][
+	ns: complement charset " #%()/[]{}"
+
+	rq: any [
+		select system/options/cgi/other-headers "HTTP_INTERNAL_REFERER"
+		get-env "REQUEST_URI"
+		"word"
+	]
+
+	if parse/all rq ["/" [1 25 [ns | "%3" ["C" | "E"]] | "/" opt "/"]][
+		foreach [from to][
+			"+" "%2B"
+			"/" "%2F"
+			"<" "%3C"
+			">" "%3E"
+			"?" "%3F"
+		][
+			replace/all next rq from to
+		]
+
+		remove-each [header value] system/options/cgi/other-headers [
+			header = "HTTP_INTERNAL_REFERER"
+		]
+
+		set-env "REQUEST_URI" join "/words/" next rq
+	]
+]
+
+do/args system/script/header/path system/script/header

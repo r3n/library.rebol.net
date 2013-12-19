@@ -1,0 +1,11 @@
+
+Options +FollowSymLinks +ExecCGI
+
+AddHandler cgi-script .cgi
+
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^.*$ /cgi-bin/library.cgi [QSA,L]
+RewriteRule ^$ /cgi-bin/library.cgi [QSA,L]
+

@@ -1,0 +1,1 @@
+This folder should be set to `chmod 770 ./` with group ownership granted to the web group as designated by the web server config.
