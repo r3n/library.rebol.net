@@ -55,9 +55,9 @@ function(PR,REB){
 PR['registerLangHandler'](
     PR['createSimpleLexer']([
          // Rebol block/parens.  Is opn/clo really needed for Rebol?
-         ['opn',             /^[\(\[]+/, null, '(['],
-         ['opn',             /^#\[]+/,],
-         ['clo',             /^[\)\]]+/, null, ')]'],
+         ['opn punct',             /^[\(\[]+/, null, '(['],
+         ['opn punct',             /^#\[]+/,],
+         ['clo punct',             /^[\)\]]+/, null, ')]'],
          //
          // Whitespace
          [PR['PR_PLAIN'],       /^[\t\n\r \xA0]+/, null, '\t\n\r \xA0'],
@@ -78,9 +78,9 @@ PR['registerLangHandler'](
          // -- none!
          [REB['none!'], /^#\[none\]/],
          // -- char!
-         [REB['char!'], /^#"(?:[^^"]|\^(?:[\^"\/\-A-Z]|\((?:[0-9A-F]{2,4}|tab|newline)\)))"/i],
+         [REB['char!'], /^#"(?:[^\^"]|\^(?:[\^\"\/\-\[\]@A-Z]|\((?:[0-9A-F]{2,4}|tab|newline)\)))"/i],
          // -- string!
-         [REB['string!'], /^"(?:[^"\\]|\\[\s\S])*(?:"|$)/],
+         [REB['string!'], /^"(?:\^(?:[\^\"\/\-\[\]@A-Z]|\((?:[0-9A-F]{2,4}|tab|newline)\))|[^"\\]+|\\[\s\S])*(?:"|$)/],
          [REB['string!'], /^\{(?:[^\}\^]|\^[\s\S])*(?:\}|$)/],
          // -- comment!
          [REB['comment!'], /^<!--(?:[^-]|-(?!->))+-->/],
@@ -144,6 +144,7 @@ PR['registerLangHandler'](
     ['rebol', 'red']);
 
 }
+
 )(
 
 PR,{
@@ -178,7 +179,8 @@ PR,{
     'set-word!': "dec dt-set-word",
     'set-path!': "fun dt-set-path",
     'rebol!': "kwd dt-rebol",
-    'comment!': "com dt-cmt"
+    'comment!': "com dt-cmt",
+	'space!': "clo dt-space"
 }
 
 )
