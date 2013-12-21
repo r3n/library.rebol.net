@@ -1,11 +1,38 @@
+
 <div class="page-header">
 <div class="container">
-	<h1><%== script %></h1>
+	<h1><%== title: script %></h1>
 </div>
 </div>
 
 <div class="container">
+<div class="row">
+
+<div class="col-md-3" role="menu">
+<ul class="nav">
+	<li>Popular Scripts</a>
+		<ul>
+			<li><%! a scripts/(script)/%,edit %>Update Script</a></li>
+			<li><%! a scripts/(script)/%,docs %>Documentation</a></li>
+			<li><%! a scripts/(script)/%.r %>Raw</a></li>
+			<li><%! a scripts/(script)/%,license %>License</a></li>
+		</ul>
+	</li>
+	<li><a href="/scripts,popular">Popular Scripts</a>
+		<ul>
+			<li>Applications</li>
+			<li>Code</li>
+		</ul>
+	</li>
+	<li><a href="/scripts,tags">Tag Index</a></li>
+	<li><a href="/scripts">All Scripts</a></li>
+</div>
+
+<div class="col-md-9" role="script">
 <pre class="code rebol prettyprint lang-rebol"><%== detab description %></pre>
+</div>
+
+</div>
 </div>
 
 <link rel="stylesheet" href="/assets/rebol.css">
