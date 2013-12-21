@@ -4,8 +4,9 @@
 <title><%== title %></title>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link href="/assets/library.css" rel="stylesheet" media="screen">
-<link href="/feeds/news.feed" type="application/atom+xml" rel="alternate" title="ReCode News Feed">
+<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=Ubuntu+Mono:400,700">
+<link rel="stylesheet" href="/assets/library.css" media="screen">
 </head>
 
 <body>
