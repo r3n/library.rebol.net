@@ -50,7 +50,10 @@ system/error/user/type: "QuarterMaster Error"
 range!: :pair! ; until REBOL v3
 else: true ; for 'case statements
 
-qm/profile: system/script/args
+qm/profile: any [
+	system/script/args
+	system/script/parent/header
+]
 
 settings: qm/settings: construct/with any [
 	qm/profile/settings
