@@ -4,8 +4,15 @@ REBOL [
 	Type: 'document
 ]
 
+(
+	rmd-cell: use [content mark][
+		content: complement charset "[^/"
+		[copy text some [some content | mark: "[cell" :mark break | "["]]
+	]
+)
+
 some [ ;here: (print here)
-	newline
+	  any space newline
 	;-- Headers / End of file
 	| "===" line (emit sect1 text)
 	| "---" line (emit sect2 text)
@@ -91,8 +98,21 @@ some [ ;here: (print here)
 		| "flickr.com" url-block (emit flickr values)
 	]
 
-	;-- load and embed fragments found in %/templates/fragments/ folder
-	| #"%" line (emit fragment text)
+	;-- Supporting other rebol.org document type
+	| "[h1" line (emit para text)
+	| "[h2" line (emit sect1 text)
+	| "[h3" line (emit sect2 text)
+	| "[p" lines (emit para para)
+	| "[numbering-on" term
+	| "[contents" term
+	| "[asis" thru newline copy para to "asis]" "asis]" term (
+		emit/verbatim code replace/all para "&gt;" ">"
+	)
+	| "[table" line (emit table-in none)
+	| "[row" term (emit table-row none)
+	| "table]" term (emit table-out none)
+	| "[li" line (emit bullet text)
+	| "[cell" rmd-cell (emit para text)
 
 	;--Defaults:
 	| ";" lines  ; comment

@@ -43,6 +43,7 @@ not-in-word any [
 		| "e)" (emit 8364)
 	] in-word
 	| #"[" copy char number "]" (emit reduce ['link to-issue char])
+	| "[date" (emit form now/date)
 	| #"[" (emit <sb>)
 	| "]" opt [paren (emit values) | (emit </sb>)] in-word
 	| #"*" [
@@ -50,7 +51,9 @@ not-in-word any [
 		| "*" (emit/after <b> </b>)
 		| (emit/after <i> </i>)
 	]
-	; | #"<" ["i>" (emit <i>) | "/i>" (emit </i>) | "b>" (emit <b>) | "/b>" (emit </b>)]
+	| #"&" ["lt;strong&gt;" (emit <b>) | "lt;/strong&gt;" (emit </b>)]
+	| #"<" ["i>" (emit <i>) | "/i>" (emit </i>) | "b>" (emit <b>) | "/b>" (emit </b>)]
+	| #"<" ["strong>" (emit <b>) | "/strong>" (emit </b>) | "em>" (emit <i>) | "/em>" (emit </i>)]
 	| #"<" (emit #"<") | #">" (emit #">") | #"&" (emit #"&")
 	; | #"~" (emit/after <code> </code>)
 	; | #"*" (emit/after <b> </b>)
@@ -59,7 +62,7 @@ not-in-word any [
 	| #"^"" (emit/after <quot> </quot>) in-word
 	| #"." ".." (emit 8230) in-word
 	| #"-" ["--" (emit 8212) | "-" (emit 8211)] in-word
-	| "\" copy char ["\" | "(" | "=" | "[" | "^"" | "'" | "." | "-" | "*"] (emit to-char char)
+	| #"\" copy char ["\" | "(" | "=" | "[" | "^"" | "'" | "." | "-" | "*"] (emit to-char char)
 	| copy char ascii (emit char) in-word
 	| copy char ucs (emit to integer! char/1) in-word
 	| copy char utf-8 (emit get-ucs-code char) in-word
