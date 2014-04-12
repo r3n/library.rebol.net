@@ -34,6 +34,21 @@ route ("download-a-script") to relocate [
 	]
 ]
 
+route ("documentation") to relocate [
+	verify [
+		params: validate request/query [
+			script: file! [wordify ".r"]
+		][
+			reject 400 "Bad Request"
+		]
+	]
+
+	get [
+		clear find script: params/script ".r"
+		redirect-to scripts/(params/script)/%,docs
+	]
+]
+
 route ("st-topic-details") to relocate [
 	verify [
 		params: validate request/query [

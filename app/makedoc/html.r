@@ -113,14 +113,14 @@ emit-image: func [spec [block!] /local out image][
 	either image: match spec [
 		src: file! | url!
 		size: opt pair!
-		alt: string!
+		alt: opt string!
 		title: opt string!
 		href: opt file! | url!
 	][
 		out: copy []
 		with image [
 			src: to-attr src
-			alt: to-attr alt
+			alt: to-attr any [alt "[Image]"]
 			title: to-attr title
 			size: any [size -1x-1]
 			width: either 0 > width: size/x [""][to-attr width]

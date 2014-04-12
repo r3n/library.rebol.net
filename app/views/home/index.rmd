@@ -9,3 +9,5 @@ Handling rebol.org-style links:
 * [Example Script: Form Date](%/view-script.r?script=form-date.r)
 
 * [Example Download: Blog](%/download-a-script.r?script-name=blog.r)
+
+* [Example Document: Extend](%/documentation.r?script=extend.r)
