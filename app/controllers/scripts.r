@@ -19,6 +19,10 @@ route (script: string! [wordify]) to %script [
 			][
 				reject 404 "Unable to Locate Script"
 			]
+
+			parse description ["<!DOCTYPE to end"][
+				reject 404 "Unable to Locate Script"
+			]
 		][
 			where %.r [
 				print description
@@ -36,13 +40,16 @@ route (script: string! [wordify]) to %script [
 			]
 
 			parse document [thru "Downloaded On" thru "^/^/" document: to end][
-				either parse document "<!DOCTYPE" [
+				either parse document ["<!DOCTYPE" to end][ ; rebol.org doesn't return 404
 					reject 404 "Document Not Available"
 				][
 					reject 400 "Could Not Parse Document"
 				]
 			]
 		][
+			require %text/clean.r
+			clean head document
+
 			where/else %.rmd [
 				print head document
 			][
