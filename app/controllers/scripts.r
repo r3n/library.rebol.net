@@ -20,7 +20,7 @@ route (script: string! [wordify]) to %script [
 				reject 404 "Unable to Locate Script"
 			]
 
-			parse description ["<!DOCTYPE to end"][
+			not parse description ["<!DOCTYPE" to end][
 				reject 404 "Unable to Locate Script"
 			]
 		][
