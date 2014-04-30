@@ -6,7 +6,8 @@ REBOL [
 ]
 
 not-in-word any [
-	  some space (emit copy " ") not-in-word
+	  " _" (emit " " emit <b>)
+	| some space (emit copy " ") not-in-word
 	| copy text some alphanum (emit text) in-word
 	| newline (emit <br />) not-in-word
 	| #"=" [
@@ -53,6 +54,7 @@ not-in-word any [
 	]
 	| #"&" ["lt;strong&gt;" (emit <b>) | "lt;/strong&gt;" (emit </b>)]
 	| #"<" ["i>" (emit <i>) | "/i>" (emit </i>) | "b>" (emit <b>) | "/b>" (emit </b>)]
+	| #"<" ["u>" (emit <b>) | "/u>" (emit </b>)]
 	| #"<" ["strong>" (emit <b>) | "/strong>" (emit </b>) | "em>" (emit <i>) | "/em>" (emit </i>)]
 	| #"<" (emit #"<") | #">" (emit #">") | #"&" (emit #"&")
 	; | #"~" (emit/after <code> </code>)
@@ -62,6 +64,7 @@ not-in-word any [
 	| #"^"" (emit/after <quot> </quot>) in-word
 	| #"." ".." (emit 8230) in-word
 	| #"-" ["--" (emit 8212) | "-" (emit 8211)] in-word
+	| "_ " (emit </b> emit " ") in-word
 	| #"\" copy char ["\" | "(" | "=" | "[" | "^"" | "'" | "." | "-" | "*"] (emit to-char char)
 	| copy char ascii (emit char) in-word
 	| copy char ucs (emit to integer! char/1) in-word
