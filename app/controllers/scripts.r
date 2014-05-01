@@ -36,22 +36,23 @@ route (script: string! [wordify]) to %script [
 				require %shell/curl.r
 				curl/fail join http://www.rebol.org/doc-download.r?format=plain&script-name= [script %.r]
 			][
-				reject 404 "Unable to Locate Document"
+				reject 404 "Unable to Retrieve Document"
+			]
+
+			not find/match document "<!DOCTYPE" [ ; rebol.org doesn't return 404
+				reject 404 "Document Not Found"
 			]
 
 			parse document [thru "Downloaded On" thru "^/^/" document: to end][
-				either parse document ["<!DOCTYPE" to end][ ; rebol.org doesn't return 404
-					reject 404 "Document Not Available"
-				][
-					reject 400 "Could Not Parse Document"
-				]
+				reject 400 "Could Not Parse Document"
 			]
 		][
 			require %text/clean.r
-			clean head document
+			meta: copy/part head document document
+			document: clean remove/part head document document
 
 			where/else %.rmd [
-				print head document
+				print join meta document
 			][
 				require %makedoc/makedoc.r
 				document: load-doc document
