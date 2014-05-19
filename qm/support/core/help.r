@@ -85,107 +85,109 @@ dump-obj: func [
 	'word [any-type!] 
 	/local value args item type-name refmode types attrs rtype
 ][
-	if unset? get/any 'word [exit]
-	if all [word? :word not value? :word] [word: mold :word]
-	if any [string? :word all [word? :word datatype? get :word]][
-		types: dump-obj/match system/words :word
-		sort types
-		if not empty? types [
-			print ["Found these words:" newline types]
+	rejoin collect [
+		if unset? get/any 'word [exit]
+		if all [word? :word not value? :word] [word: mold :word]
+		if any [string? :word all [word? :word datatype? get :word]][
+			types: dump-obj/match system/words :word
+			sort types
+			if not empty? types [
+				keep reform ["Found these words:" newline types newline]
+				exit
+			]
+			keep reform ["No information on" word "(word has no value)" newline] 
 			exit
-		]
-		print ["No information on" word "(word has no value)"] 
-		exit
-	] 
-	type-name: func [value] [
-		value: mold type? :value 
-		clear back tail value 
-		join either find "aeiou" first value ["an "] ["a "] value
-	] 
-	if not any [word? :word path? :word] [
-		print [mold :word "is" type-name :word] 
-		exit
-	] 
-	value: either path? :word [first reduce reduce [word]] [get :word] 
-	if not any-function? :value [
-		prin [uppercase mold word "is" type-name :value "of value: "] 
-		print either object? value [print "" dump-obj value] [mold :value] 
-		exit
-	] 
-	args: third :value 
-	prin "USAGE:^/^-" 
-	if not op? :value [prin append uppercase mold word " "] 
-	while [not tail? args] [
-		item: first args 
-		if :item = /local [break] 
-		if any [all [any-word? :item not set-word? :item] refinement? :item] [
-			prin append mold :item " " 
-			if op? :value [prin append uppercase mold word " " value: none]
 		] 
-		args: next args
-	] 
-	print "" 
-	args: head args 
-	value: get word 
-	print "^/DESCRIPTION:" 
-	either string? pick args 1 [
-		print [tab first args newline tab uppercase mold word "is" type-name :value "value."] 
-		args: next args
-	][
-		print "^-(undocumented)"
-	] 
-	if block? pick args 1 [
-		attrs: first args 
-		args: next args
-	] 
-	if tail? args [exit] 
-	while [not tail? args] [
-		item: first args 
-		args: next args 
-		if :item = /local [break] 
-		either not refinement? :item [
-			all [set-word? :item :item = to-set-word 'return block? first args rtype: first args] 
-			if none? refmode [
-				print "^/ARGUMENTS:" 
-				refmode: 'args
-			]
-		] [
-			if refmode <> 'refs [
-				print "^/REFINEMENTS:" 
-				refmode: 'refs
+		type-name: func [value] [
+			value: mold type? :value 
+			clear back tail value 
+			join either find "aeiou" first value ["an "] ["a "] value
+		] 
+		if not any [word? :word path? :word] [
+			keep reform [mold :word "is" type-name :word newline] 
+			exit
+		] 
+		value: either path? :word [first reduce reduce [word]] [get :word] 
+		if not any-function? :value [
+			keep reform [uppercase mold word "is" type-name :value "of value: "] 
+			keep either object? value [keep "^/" dump-obj value] [mold :value] 
+			keep "^/"
+			exit
+		] 
+		args: third :value 
+		keep "USAGE:^/^-" 
+		if not op? :value [keep append uppercase mold word " "] 
+		while [not tail? args] [
+			item: first args 
+			if :item = /local [break] 
+			if any [all [any-word? :item not set-word? :item] refinement? :item] [
+				keep append mold :item " " 
+				if op? :value [keep append uppercase mold word " " value: none]
+			] 
+			args: next args
+		] 
+		keep "^/" 
+		args: head args 
+		value: get word 
+		keep "^/DESCRIPTION:^/" 
+		either string? pick args 1 [
+			keep reform [tab first args newline tab uppercase mold word "is" type-name :value "value.^/"] 
+			args: next args
+		][
+			keep "^-(undocumented)^/"
+		] 
+		if block? pick args 1 [
+			attrs: first args 
+			args: next args
+		] 
+		if tail? args [exit] 
+		while [not tail? args] [
+			item: first args 
+			args: next args 
+			if :item = /local [break] 
+			either not refinement? :item [
+				all [set-word? :item :item = to-set-word 'return block? first args rtype: first args] 
+				if none? refmode [
+					keep "^/ARGUMENTS:^/" 
+					refmode: 'args
+				]
+			] [
+				if refmode <> 'refs [
+					keep "^/REFINEMENTS:^/" 
+					refmode: 'refs
+				]
+			] 
+			either refinement? :item [
+				keep reform [tab mold item] 
+				if string? pick args 1 [keep reform [" --" first args] args: next args] 
+				keep "^/"
+			] [
+				if all [any-word? :item not set-word? :item] [
+					if refmode = 'refs [keep tab] 
+					keep reform [tab :item "-- "] 
+					types: if block? pick args 1 [args: next args first back args] 
+					if string? pick args 1 [keep reform [first args ""] args: next args] 
+					if not types [types: 'any] 
+					keep rejoin ["(Type: " types ")"] 
+					keep "^/"
+				]
 			]
 		] 
-		either refinement? :item [
-			prin [tab mold item] 
-			if string? pick args 1 [prin [" --" first args] args: next args] 
-			print ""
-		] [
-			if all [any-word? :item not set-word? :item] [
-				if refmode = 'refs [prin tab] 
-				prin [tab :item "-- "] 
-				types: if block? pick args 1 [args: next args first back args] 
-				if string? pick args 1 [prin [first args ""] args: next args] 
-				if not types [types: 'any] 
-				prin rejoin ["(Type: " types ")"] 
-				print ""
+		if rtype [keep reform ["^/RETURNS:^/^-" rtype newline]]
+		if attrs [
+			keep "^/(SPECIAL ATTRIBUTES)^/" 
+			while [not tail? attrs] [
+				value: first attrs 
+				attrs: next attrs 
+				if any-word? value [
+					keep reform [tab value] 
+					if string? pick attrs 1 [
+						keep reform [" -- " first attrs] 
+						attrs: next attrs
+					] 
+					keep "^/"
+				]
 			]
-		]
-	] 
-	if rtype [print ["^/RETURNS:^/^-" rtype]]
-	if attrs [
-		print "^/(SPECIAL ATTRIBUTES)" 
-		while [not tail? attrs] [
-			value: first attrs 
-			attrs: next attrs 
-			if any-word? value [
-				prin [tab value] 
-				if string? pick attrs 1 [
-					prin [" -- " first attrs] 
-					attrs: next attrs
-				] 
-				print ""
-			]
-		]
-	] 
-	exit
+		] 
+	]
 ]

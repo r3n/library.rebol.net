@@ -1,4 +1,4 @@
-REBOL [
+Rebol [
 	Title: "Color Code"
 	Date: 21-Oct-2013
 	Author: "Christopher Ross-Gill"
@@ -9,11 +9,12 @@ REBOL [
 		Colorize source code based on datatype.
 		Result is HTML <pre> block.
 		Works with R3
-		Sample CSS: http://www.ross-gill.com/styles/rebol-code.css
+		Sample CSS: http://reb4.me/s/rebol.css
 	}
+	Version: 2.1.1
 	History: [
-		23-Oct-2009 "First QM Module" "Christopher Ross-Gill"
-		29-May-2003 "Fixed deep parse rule bug." "Carl Sassenrath"
+		23-Oct-2009 2.1.0 "First QM Module" "Christopher Ross-Gill"
+		29-May-2003 1.0.0 "Fixed deep parse rule bug." "Carl Sassenrath"
 	]
 ]
 
@@ -69,7 +70,7 @@ color-code: use [out emit emit-var emit-header rule value][
 					"word"
 				]
 			][
-				any [replace to-string type?/word :value "!" ""]
+				any [replace to string! type?/word :value "!" ""]
 			]
 		]
 

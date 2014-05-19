@@ -3,7 +3,7 @@ REBOL [
 	Date: 14-Aug-2013
 	Purpose: "Trims and Converts Errant CP-1252 to UTF-8"
 	Author: "Christopher Ross-Gill"
-	Version: 0.1.0
+	Version: 0.1.1
 	Type: 'module
 	Exports: [clean encode-utf8]
 ]
