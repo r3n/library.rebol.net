@@ -44,6 +44,7 @@ body.script .code.rebol {
 .code.rebol .dt-date {color: #079;}
 .code.rebol .dt-decimal {color: #079;}
 .code.rebol .dt-email {color: #072;}
+.code.rebol .dt-error {color: #fff; background: #900;}
 .code.rebol .dt-file {color: #072;}
 .code.rebol .dt-integer {color: #079;}
 .code.rebol .dt-issue {color: #072;}

@@ -24,6 +24,7 @@ route (script: string! [wordify]) to %script [
 				reject 404 "Unable to Locate Script"
 			]
 		][
+			replace/case description "REBOL [" "Rebol ["
 			where %.r [
 				print description
 			]

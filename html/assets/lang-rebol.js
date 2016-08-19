@@ -73,6 +73,7 @@ PR['registerLangHandler'](
          [REB['comment!'], /^;[^\r\n]*/],
          [REB['comment!'], /^comment\s*\{(?:[^\}\^]|\^[\s\S])*(?:\}|$)/],
          [REB['comment!'], /^comment\s*\[(?:[^\]\\]|\\[\s\S])*(?:\]|$)/],
+         [REB['error!'], /^\*\*[^\r\n]*(\r?\n\*\*[^\r\n]*)+/],
          // -- logic!
          [REB['logic!'], /^#\[(?:true|false|yes|no|on|off)\]/],
          // -- none!
@@ -160,6 +161,7 @@ PR,{
     'date!': "str dt-date",
     'decimal!': "lit dt-decimal",
     'email!': "str dt-email",
+    'error!': "com dt-error",
     'file!': "str dt-file",
     'integer!': "lit dt-integer",
     'issue!': "str dt-issue",

@@ -1,16 +1,16 @@
-<div class="container">
-<div class="row">
+	<div class="container">
+		<div class="row">
 
 
 <%= render/partial %metadata %>
 
-<div class="col-md-9 col-md-pull-3" role="script">
-<pre class="code rebol prettyprint lang-rebol"><%== detab description %></pre>
-</div>
+			<div class="col-md-9 col-md-pull-3" role="script">
+				<pre class="code rebol prettyprint lang-rebol"><%== detab description %></pre>
+			</div>
 
-</div>
-</div>
+		</div>
+	</div>
 
 <link rel="stylesheet" href="/assets/rebol.css">
-<script type="text/javascript" src="//google-code-prettify.googlecode.com/svn/loader/run_prettify.js"></script>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/prettify/r298/run_prettify.js"></script>
 <script type="text/javascript" src="/assets/lang-rebol.js"></script>
